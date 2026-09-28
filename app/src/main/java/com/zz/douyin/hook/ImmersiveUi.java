@@ -92,6 +92,7 @@ final class ImmersiveUi {
     private static int filterCandidateCount;
     private static long filterCandidateAt;
     private static String lastAcceptedAid;
+    private static boolean lastContentNonVideo;
 
     private ImmersiveUi() {
     }
@@ -1510,7 +1511,7 @@ final class ImmersiveUi {
         boolean candidatePending =
                 filterCandidateCount > 0 && now - filterCandidateAt <= 900L;
         if (now < contentCheckNotBefore) {
-            return candidatePending;
+            return candidatePending || lastContentNonVideo;
         }
         boolean activelyArmed = now <= contentCheckUntil || candidatePending;
         long minimumInterval = activelyArmed
@@ -1518,12 +1519,13 @@ final class ImmersiveUi {
                 : FALLBACK_CONTENT_CHECK_INTERVAL_MS;
         if (now - lastContentCheckAt < minimumInterval
                 || now - lastFilteredSwipeAt < 1_500L) {
-            return candidatePending;
+            return candidatePending || lastContentNonVideo;
         }
         lastContentCheckAt = now;
 
         FeedContentTracker.Snapshot model = FeedContentTracker.current(decor);
         if (model != null) {
+            lastContentNonVideo = !model.isVideoContent();
             if (PlaybackState.clearUserPauseForContentChange(model.aid)) {
                 transitionBoostUntil = Math.max(
                         transitionBoostUntil,
