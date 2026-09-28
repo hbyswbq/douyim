@@ -1,0 +1,154 @@
+package com.zz.douyin;
+
+import android.content.SharedPreferences;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+public final class FilterPreferences {
+    public static final String NAME = "content_filter";
+    public static final String KEY_MODULE_ENABLED = "module_enabled";
+    public static final String KEY_BLOCK_DOUBLE_TAP = "block_double_tap";
+    public static final String KEY_IMMERSIVE_ENABLED = "immersive_enabled";
+    public static final String KEY_SKIP_ADS = "skip_ads";
+    public static final String KEY_SKIP_IMAGES = "skip_images";
+    public static final String KEY_SKIP_LIVES = "skip_lives";
+    public static final String KEY_SKIP_VIDEOS = "skip_videos";
+    public static final String KEY_VIDEO_KEYWORDS = "video_keywords";
+    public static final String KEY_SHOW_DANMAKU = "show_danmaku";
+    public static final String KEY_DOUBLE_TAP_MODE = "double_tap_mode";
+    public static final String KEY_IMMERSIVE_STATUS_BAR = "immersive_status_bar";
+    public static final String KEY_IMMERSIVE_NAV_BAR = "immersive_nav_bar";
+
+    public static final int DOUBLE_TAP_LIKE = 0;
+    public static final int DOUBLE_TAP_COMMENT = 1;
+
+    public static final boolean DEFAULT_SKIP_ADS = true;
+    public static final boolean DEFAULT_SKIP_IMAGES = true;
+    public static final boolean DEFAULT_SKIP_LIVES = true;
+    public static final boolean DEFAULT_SKIP_VIDEOS = false;
+    public static final boolean DEFAULT_SHOW_DANMAKU = false;
+
+    private FilterPreferences() {
+    }
+
+    public static boolean readModuleEnabled(SharedPreferences preferences) {
+        return preferences == null || preferences.getBoolean(KEY_MODULE_ENABLED, true);
+    }
+
+    public static boolean readBlockDoubleTap(SharedPreferences preferences) {
+        return preferences != null && preferences.getBoolean(KEY_BLOCK_DOUBLE_TAP, false);
+    }
+
+    public static boolean readImmersiveEnabled(SharedPreferences preferences) {
+        return preferences == null || preferences.getBoolean(KEY_IMMERSIVE_ENABLED, true);
+    }
+
+    public static Values defaults() {
+        return new Values(
+                DEFAULT_SKIP_ADS,
+                DEFAULT_SKIP_IMAGES,
+                DEFAULT_SKIP_LIVES,
+                DEFAULT_SKIP_VIDEOS,
+                ""
+        );
+    }
+
+    public static Values read(SharedPreferences preferences) {
+        if (preferences == null) {
+            return defaults();
+        }
+        return new Values(
+                preferences.getBoolean(KEY_SKIP_ADS, DEFAULT_SKIP_ADS),
+                preferences.getBoolean(KEY_SKIP_IMAGES, DEFAULT_SKIP_IMAGES),
+                preferences.getBoolean(KEY_SKIP_LIVES, DEFAULT_SKIP_LIVES),
+                preferences.getBoolean(KEY_SKIP_VIDEOS, DEFAULT_SKIP_VIDEOS),
+                preferences.getString(KEY_VIDEO_KEYWORDS, "")
+        );
+    }
+
+    public static boolean readShowDanmaku(SharedPreferences preferences) {
+        return preferences == null
+                ? DEFAULT_SHOW_DANMAKU
+                : preferences.getBoolean(KEY_SHOW_DANMAKU, DEFAULT_SHOW_DANMAKU);
+    }
+
+    public static int readDoubleTapMode(SharedPreferences preferences) {
+        return preferences == null
+                ? DOUBLE_TAP_LIKE
+                : preferences.getInt(KEY_DOUBLE_TAP_MODE, DOUBLE_TAP_LIKE);
+    }
+
+    public static boolean readImmersiveStatusBar(SharedPreferences preferences) {
+        return preferences != null && preferences.getBoolean(KEY_IMMERSIVE_STATUS_BAR, false);
+    }
+
+    public static boolean readImmersiveNavBar(SharedPreferences preferences) {
+        return preferences != null && preferences.getBoolean(KEY_IMMERSIVE_NAV_BAR, false);
+    }
+
+    public static final class Values {
+        public final boolean skipAds;
+        public final boolean skipImages;
+        public final boolean skipLives;
+        public final boolean skipVideos;
+        public final String keywordText;
+        private final List<String> keywords;
+
+        public Values(
+                boolean skipAds,
+                boolean skipImages,
+                boolean skipLives,
+                boolean skipVideos,
+                String keywordText
+        ) {
+            this.skipAds = skipAds;
+            this.skipImages = skipImages;
+            this.skipLives = skipLives;
+            this.skipVideos = skipVideos;
+            this.keywordText = keywordText == null ? "" : keywordText;
+            this.keywords = parseKeywords(this.keywordText);
+        }
+
+        public List<String> keywords() {
+            return keywords;
+        }
+
+        public String matchingVideoKeyword(String title, String description) {
+            if (keywords.isEmpty()) {
+                return null;
+            }
+            String searchable = safeLower(title) + "\n" + safeLower(description);
+            for (String keyword : keywords) {
+                if (searchable.contains(safeLower(keyword))) {
+                    return keyword;
+                }
+            }
+            return null;
+        }
+
+        private static List<String> parseKeywords(String raw) {
+            if (raw == null || raw.trim().isEmpty()) {
+                return Collections.emptyList();
+            }
+            Set<String> unique = new LinkedHashSet<>();
+            for (String part : raw.split("[\\r\\n,，;；]+")) {
+                String keyword = part.trim();
+                if (!keyword.isEmpty()) {
+                    unique.add(keyword);
+                }
+            }
+            return unique.isEmpty()
+                    ? Collections.emptyList()
+                    : Collections.unmodifiableList(new ArrayList<>(unique));
+        }
+
+        private static String safeLower(String value) {
+            return value == null ? "" : value.toLowerCase(Locale.ROOT);
+        }
+    }
+}

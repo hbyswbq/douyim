@@ -1,0 +1,478 @@
+package com.zz.douyin;
+
+import android.app.Activity;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import io.github.libxposed.service.XposedService;
+
+public final class MainActivity extends Activity
+        implements ModuleApplication.ServiceStateListener {
+    private static final int BACKGROUND = Color.rgb(16, 17, 20);
+    private static final int CARD = Color.rgb(28, 29, 34);
+    private static final int PRIMARY = Color.rgb(254, 44, 85);
+    private static final int TEXT_PRIMARY = Color.rgb(245, 245, 248);
+    private static final int TEXT_SECONDARY = Color.rgb(169, 171, 180);
+
+    private TextView serviceStatus;
+    private Switch moduleEnabled;
+    private Switch blockDoubleTap;
+    private Switch immersiveEnabled;
+    private Switch skipAds;
+    private Switch skipImages;
+    private Switch skipLives;
+    private Switch skipVideos;
+    private Switch showDanmaku;
+    private Switch immersiveStatusBar;
+    private Switch immersiveNavBar;
+    private Button doubleTapLike;
+    private Button doubleTapComment;
+    private EditText keywordInput;
+    private Button saveKeywords;
+    private SharedPreferences preferences;
+    private boolean loading = true;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(buildContent());
+        setControlsEnabled(false);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        ModuleApplication.addServiceStateListener(this, true);
+    }
+
+    @Override
+    protected void onStop() {
+        ModuleApplication.removeServiceStateListener(this);
+        super.onStop();
+    }
+
+    @Override
+    public void onServiceStateChanged(XposedService service) {
+        runOnUiThread(() -> bindPreferences(service));
+    }
+
+    private View buildContent() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(BACKGROUND);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(20), dp(32), dp(20), dp(32));
+        scroll.addView(root, matchWrap());
+
+        TextView title = text("抖仙人", 28, TEXT_PRIMARY);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        root.addView(title, matchWrap());
+
+        TextView subtitle = text("播放与内容设置", 15, PRIMARY);
+        LinearLayout.LayoutParams subtitleParams = matchWrap();
+        subtitleParams.topMargin = dp(4);
+        root.addView(subtitle, subtitleParams);
+
+        serviceStatus = text("正在连接 LSPosed 服务…", 13, TEXT_SECONDARY);
+        LinearLayout.LayoutParams statusParams = matchWrap();
+        statusParams.topMargin = dp(16);
+        root.addView(serviceStatus, statusParams);
+
+        LinearLayout masterCard = card();
+        moduleEnabled = addSwitch(masterCard, "功能总开关",
+                "关闭后恢复抖音原有界面和操作，所有模块功能停止生效",
+                FilterPreferences.KEY_MODULE_ENABLED);
+        LinearLayout.LayoutParams masterParams = matchWrap();
+        masterParams.topMargin = dp(20);
+        root.addView(masterCard, masterParams);
+
+        TextView typeHeader = sectionTitle("跳过类型");
+        LinearLayout.LayoutParams typeHeaderParams = matchWrap();
+        typeHeaderParams.topMargin = dp(28);
+        root.addView(typeHeader, typeHeaderParams);
+
+        LinearLayout typeCard = card();
+        skipAds = addSwitch(
+                typeCard,
+                "广告",
+                "跳过当前模型明确标记的广告",
+                FilterPreferences.KEY_SKIP_ADS
+        );
+        addDivider(typeCard);
+        skipImages = addSwitch(
+                typeCard,
+                "图文",
+                "跳过图集、长文章及其他非视频内容",
+                FilterPreferences.KEY_SKIP_IMAGES
+        );
+        addDivider(typeCard);
+        skipLives = addSwitch(
+                typeCard,
+                "直播",
+                "跳过直播间内容",
+                FilterPreferences.KEY_SKIP_LIVES
+        );
+        addDivider(typeCard);
+        skipVideos = addSwitch(
+                typeCard,
+                "视频",
+                "跳过全部普通视频；关闭时仍应用关键词过滤",
+                FilterPreferences.KEY_SKIP_VIDEOS
+        );
+        LinearLayout.LayoutParams typeCardParams = matchWrap();
+        typeCardParams.topMargin = dp(10);
+        root.addView(typeCard, typeCardParams);
+
+        TextView playbackHeader = sectionTitle("播放设置");
+        LinearLayout.LayoutParams playbackHeaderParams = matchWrap();
+        playbackHeaderParams.topMargin = dp(28);
+        root.addView(playbackHeader, playbackHeaderParams);
+
+        LinearLayout playbackCard = card();
+        immersiveEnabled = addSwitch(playbackCard, "沉浸式播放",
+                "播放时隐藏界面，暂停时恢复；关闭后仍可使用过滤、双击拦截和下载",
+                FilterPreferences.KEY_IMMERSIVE_ENABLED);
+        addDivider(playbackCard);
+        showDanmaku = addSwitch(
+                playbackCard,
+                "播放弹幕",
+                "纯净播放时保留抖音原生弹幕，其他界面仍保持隐藏",
+                FilterPreferences.KEY_SHOW_DANMAKU
+        );
+        addDivider(playbackCard);
+        blockDoubleTap = addSwitch(playbackCard, "禁用屏幕双击",
+                "拦截视频画面双击，保留单击暂停、滑动和侧边长按",
+                FilterPreferences.KEY_BLOCK_DOUBLE_TAP);
+        addDivider(playbackCard);
+        // 双击响应类型
+        TextView doubleTapLabel = text("双击视频响应", 17, TEXT_PRIMARY);
+        doubleTapLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        doubleTapLabel.setPadding(dp(16), dp(14), dp(16), dp(6));
+        playbackCard.addView(doubleTapLabel, matchWrap());
+        TextView doubleTapDesc = text("选择双击视频时的行为：点赞或打开评论区", 13, TEXT_SECONDARY);
+        doubleTapDesc.setPadding(dp(16), 0, dp(16), dp(8));
+        playbackCard.addView(doubleTapDesc, matchWrap());
+        LinearLayout doubleTapRow = new LinearLayout(this);
+        doubleTapRow.setOrientation(LinearLayout.HORIZONTAL);
+        doubleTapRow.setPadding(dp(16), 0, dp(16), dp(14));
+        doubleTapLike = new Button(this);
+        doubleTapLike.setText("点赞");
+        doubleTapLike.setTextSize(14);
+        doubleTapLike.setAllCaps(false);
+        doubleTapLike.setOnClickListener(v -> setDoubleTapMode(FilterPreferences.DOUBLE_TAP_LIKE));
+        LinearLayout.LayoutParams likeParams = new LinearLayout.LayoutParams(0, dp(40), 1f);
+        likeParams.rightMargin = dp(8);
+        doubleTapRow.addView(doubleTapLike, likeParams);
+        doubleTapComment = new Button(this);
+        doubleTapComment.setText("打开评论");
+        doubleTapComment.setTextSize(14);
+        doubleTapComment.setAllCaps(false);
+        doubleTapComment.setOnClickListener(v -> setDoubleTapMode(FilterPreferences.DOUBLE_TAP_COMMENT));
+        LinearLayout.LayoutParams commentParams = new LinearLayout.LayoutParams(0, dp(40), 1f);
+        doubleTapRow.addView(doubleTapComment, commentParams);
+        playbackCard.addView(doubleTapRow, matchWrap());
+        LinearLayout.LayoutParams playbackCardParams = matchWrap();
+        playbackCardParams.topMargin = dp(10);
+        root.addView(playbackCard, playbackCardParams);
+
+        // 系统沉浸设置
+        TextView systemHeader = sectionTitle("系统沉浸");
+        LinearLayout.LayoutParams systemHeaderParams = matchWrap();
+        systemHeaderParams.topMargin = dp(28);
+        root.addView(systemHeader, systemHeaderParams);
+        LinearLayout systemCard = card();
+        immersiveStatusBar = addSwitch(systemCard, "隐藏状态栏",
+                "全屏沉浸时隐藏顶部状态栏，内容延伸到刘海区域",
+                FilterPreferences.KEY_IMMERSIVE_STATUS_BAR);
+        addDivider(systemCard);
+        immersiveNavBar = addSwitch(systemCard, "隐藏导航栏",
+                "全屏沉浸时隐藏底部导航栏，上滑可临时显示",
+                FilterPreferences.KEY_IMMERSIVE_NAV_BAR);
+        LinearLayout.LayoutParams systemCardParams = matchWrap();
+        systemCardParams.topMargin = dp(10);
+        root.addView(systemCard, systemCardParams);
+
+        TextView keywordHeader = sectionTitle("视频关键词");
+        LinearLayout.LayoutParams keywordHeaderParams = matchWrap();
+        keywordHeaderParams.topMargin = dp(28);
+        root.addView(keywordHeader, keywordHeaderParams);
+
+        LinearLayout keywordCard = card();
+        TextView keywordHint = text(
+                "普通视频的标题或介绍包含任意关键词时自动跳过。忽略英文大小写，支持换行、逗号或分号分隔。",
+                14,
+                TEXT_SECONDARY
+        );
+        keywordHint.setLineSpacing(0, 1.25f);
+        keywordCard.addView(keywordHint, matchWrap());
+
+        keywordInput = new EditText(this);
+        keywordInput.setTextColor(TEXT_PRIMARY);
+        keywordInput.setHintTextColor(Color.rgb(112, 114, 123));
+        keywordInput.setTextSize(16);
+        keywordInput.setHint("例如：游戏推广\n不感兴趣\n带货");
+        keywordInput.setGravity(Gravity.TOP | Gravity.START);
+        keywordInput.setMinLines(4);
+        keywordInput.setMaxLines(8);
+        keywordInput.setInputType(
+                InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                        | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        );
+        GradientDrawable inputBackground = rounded(Color.rgb(38, 39, 45), 12);
+        inputBackground.setStroke(dp(1), Color.rgb(58, 60, 68));
+        keywordInput.setBackground(inputBackground);
+        keywordInput.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout.LayoutParams inputParams = matchWrap();
+        inputParams.topMargin = dp(14);
+        keywordCard.addView(keywordInput, inputParams);
+
+        saveKeywords = new Button(this);
+        saveKeywords.setText("保存关键词");
+        saveKeywords.setTextColor(Color.WHITE);
+        saveKeywords.setTextSize(15);
+        saveKeywords.setAllCaps(false);
+        saveKeywords.setBackground(rounded(PRIMARY, 12));
+        saveKeywords.setOnClickListener(view -> saveKeywordSettings());
+        LinearLayout.LayoutParams buttonParams = matchWrap();
+        buttonParams.topMargin = dp(14);
+        buttonParams.height = dp(48);
+        keywordCard.addView(saveKeywords, buttonParams);
+
+        LinearLayout.LayoutParams keywordCardParams = matchWrap();
+        keywordCardParams.topMargin = dp(10);
+        root.addView(keywordCard, keywordCardParams);
+
+        TextView footer = text(
+                "设置保存后会同步给抖音进程。若抖音已在后台运行但未立即生效，请强制停止后重新打开。",
+                13,
+                TEXT_SECONDARY
+        );
+        footer.setLineSpacing(0, 1.25f);
+        LinearLayout.LayoutParams footerParams = matchWrap();
+        footerParams.topMargin = dp(20);
+        root.addView(footer, footerParams);
+        return scroll;
+    }
+
+    private void bindPreferences(XposedService service) {
+        loading = true;
+        if (service == null) {
+            preferences = null;
+            serviceStatus.setText("未连接 LSPosed 服务，设置暂不可修改");
+            serviceStatus.setTextColor(Color.rgb(255, 166, 77));
+            setControlsEnabled(false);
+            loading = false;
+            return;
+        }
+
+        preferences = service.getRemotePreferences(FilterPreferences.NAME);
+        moduleEnabled.setChecked(FilterPreferences.readModuleEnabled(preferences));
+        immersiveEnabled.setChecked(FilterPreferences.readImmersiveEnabled(preferences));
+        blockDoubleTap.setChecked(FilterPreferences.readBlockDoubleTap(preferences));
+        FilterPreferences.Values values = FilterPreferences.read(preferences);
+        skipAds.setChecked(values.skipAds);
+        skipImages.setChecked(values.skipImages);
+        skipLives.setChecked(values.skipLives);
+        skipVideos.setChecked(values.skipVideos);
+        showDanmaku.setChecked(FilterPreferences.readShowDanmaku(preferences));
+        immersiveStatusBar.setChecked(FilterPreferences.readImmersiveStatusBar(preferences));
+        immersiveNavBar.setChecked(FilterPreferences.readImmersiveNavBar(preferences));
+        updateDoubleTapButtons(FilterPreferences.readDoubleTapMode(preferences));
+        keywordInput.setText(values.keywordText);
+        keywordInput.setSelection(keywordInput.length());
+        serviceStatus.setText(
+                "已连接 " + service.getFrameworkName()
+                        + " · API " + service.getApiVersion()
+        );
+        serviceStatus.setTextColor(Color.rgb(84, 214, 142));
+        setControlsEnabled(true);
+        loading = false;
+    }
+
+    private Switch addSwitch(
+            LinearLayout parent,
+            String label,
+            String description,
+            String preferenceKey
+    ) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), dp(14), dp(12), dp(14));
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView labelView = text(label, 17, TEXT_PRIMARY);
+        labelView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        copy.addView(labelView, matchWrap());
+        TextView descriptionView = text(description, 13, TEXT_SECONDARY);
+        descriptionView.setLineSpacing(0, 1.15f);
+        LinearLayout.LayoutParams descriptionParams = matchWrap();
+        descriptionParams.topMargin = dp(3);
+        copy.addView(descriptionView, descriptionParams);
+        row.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        Switch toggle = new Switch(this);
+        toggle.setContentDescription(label);
+        toggle.setShowText(false);
+        toggle.setButtonTintList(null);
+        toggle.setOnCheckedChangeListener((button, checked) -> {
+            if (!loading) {
+                saveBoolean(preferenceKey, checked);
+            }
+        });
+        row.addView(toggle, wrapWrap());
+        parent.addView(row, matchWrap());
+        return toggle;
+    }
+
+    private void saveBoolean(String key, boolean value) {
+        SharedPreferences current = preferences;
+        if (current == null) {
+            return;
+        }
+        SharedPreferences.Editor editor = current.edit();
+        if (editor != null) {
+            editor.putBoolean(key, value).apply();
+        }
+    }
+
+    private void saveInt(String key, int value) {
+        SharedPreferences current = preferences;
+        if (current == null) {
+            return;
+        }
+        SharedPreferences.Editor editor = current.edit();
+        if (editor != null) {
+            editor.putInt(key, value).apply();
+        }
+    }
+
+    private void setDoubleTapMode(int mode) {
+        if (loading) return;
+        saveInt(FilterPreferences.KEY_DOUBLE_TAP_MODE, mode);
+        updateDoubleTapButtons(mode);
+    }
+
+    private void updateDoubleTapButtons(int mode) {
+        boolean isLike = mode == FilterPreferences.DOUBLE_TAP_LIKE;
+        doubleTapLike.setBackground(rounded(isLike ? PRIMARY : Color.rgb(58, 60, 68), 10));
+        doubleTapLike.setTextColor(isLike ? Color.WHITE : TEXT_SECONDARY);
+        doubleTapComment.setBackground(rounded(!isLike ? PRIMARY : Color.rgb(58, 60, 68), 10));
+        doubleTapComment.setTextColor(!isLike ? Color.WHITE : TEXT_SECONDARY);
+    }
+
+    private void saveKeywordSettings() {
+        SharedPreferences current = preferences;
+        if (current == null) {
+            Toast.makeText(this, "未连接 LSPosed 服务", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        SharedPreferences.Editor editor = current.edit();
+        if (editor == null) {
+            Toast.makeText(this, "设置保存失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        editor.putString(
+                FilterPreferences.KEY_VIDEO_KEYWORDS,
+                keywordInput.getText().toString().trim()
+        ).apply();
+        Toast.makeText(this, "关键词已保存", Toast.LENGTH_SHORT).show();
+    }
+
+    private void setControlsEnabled(boolean enabled) {
+        moduleEnabled.setEnabled(enabled);
+        blockDoubleTap.setEnabled(enabled);
+        immersiveEnabled.setEnabled(enabled);
+        skipAds.setEnabled(enabled);
+        skipImages.setEnabled(enabled);
+        skipLives.setEnabled(enabled);
+        skipVideos.setEnabled(enabled);
+        showDanmaku.setEnabled(enabled);
+        immersiveStatusBar.setEnabled(enabled);
+        immersiveNavBar.setEnabled(enabled);
+        doubleTapLike.setEnabled(enabled);
+        doubleTapComment.setEnabled(enabled);
+        doubleTapLike.setAlpha(enabled ? 1f : 0.45f);
+        doubleTapComment.setAlpha(enabled ? 1f : 0.45f);
+        keywordInput.setEnabled(enabled);
+        saveKeywords.setEnabled(enabled);
+        saveKeywords.setAlpha(enabled ? 1f : 0.45f);
+    }
+
+    private LinearLayout card() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(2), dp(2), dp(2), dp(2));
+        layout.setBackground(rounded(CARD, 16));
+        return layout;
+    }
+
+    private void addDivider(LinearLayout parent) {
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.rgb(47, 48, 55));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(1)
+        );
+        params.leftMargin = dp(16);
+        params.rightMargin = dp(16);
+        parent.addView(divider, params);
+    }
+
+    private TextView sectionTitle(String value) {
+        TextView view = text(value, 18, TEXT_PRIMARY);
+        view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return view;
+    }
+
+    private TextView text(CharSequence value, float size, int color) {
+        TextView view = new TextView(this);
+        view.setText(value);
+        view.setTextSize(size);
+        view.setTextColor(color);
+        return view;
+    }
+
+    private GradientDrawable rounded(int color, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        return drawable;
+    }
+
+    private static LinearLayout.LayoutParams matchWrap() {
+        return new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+    }
+
+    private static LinearLayout.LayoutParams wrapWrap() {
+        return new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+}
