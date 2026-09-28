@@ -112,8 +112,9 @@ final class DoubleTapGuard {
     }
 
     /**
-     * 遍历 View 树找到评论按钮并模拟点击。
-     * 移植自 FreedomPlus 的 onClickView，通过 contentDescription 匹配"评论"。
+     * 遍历 View 树找到评论按钮，直接调用其 OnClickListener。
+     * 移植自 FreedomPlus 的 onClickView：优先直接调用 listener，
+     * 绕过 performClick 在沉浸模式下触发的 UI 状态切换。
      */
     private static void openCommentPanel() {
         try {
@@ -123,14 +124,45 @@ final class DoubleTapGuard {
             }
             View root = activity.getWindow().getDecorView();
             View commentButton = findViewByContentDescription(root, "评论");
-            if (commentButton != null && commentButton.isShown()) {
-                commentButton.performClick();
-                Log.i(DouyinModule.TAG, "clicked comment button: " + commentButton.getClass().getName());
-            } else {
+            if (commentButton == null) {
                 Log.w(DouyinModule.TAG, "comment button not found");
+                return;
+            }
+
+            // 优先直接获取 OnClickListener 并调用，绕过 performClick
+            View.OnClickListener listener = getOnClickListener(commentButton);
+            if (listener != null) {
+                listener.onClick(commentButton);
+                Log.i(DouyinModule.TAG, "invoked comment OnClickListener: "
+                        + commentButton.getClass().getName());
+            } else {
+                commentButton.performClick();
+                Log.i(DouyinModule.TAG, "performClick comment button: "
+                        + commentButton.getClass().getName());
             }
         } catch (Throwable t) {
             Log.e(DouyinModule.TAG, "open comment panel failed", t);
+        }
+    }
+
+    /** 通过反射获取 View 的 OnClickListener。 */
+    private static View.OnClickListener getOnClickListener(View view) {
+        try {
+            java.lang.reflect.Field field = View.class.getDeclaredField("mListenerInfo");
+            field.setAccessible(true);
+            Object listenerInfo = field.get(view);
+            if (listenerInfo == null) {
+                return null;
+            }
+            java.lang.reflect.Field onClickField =
+                    listenerInfo.getClass().getDeclaredField("mOnClickListener");
+            onClickField.setAccessible(true);
+            Object listener = onClickField.get(listenerInfo);
+            return listener instanceof View.OnClickListener
+                    ? (View.OnClickListener) listener
+                    : null;
+        } catch (Throwable t) {
+            return null;
         }
     }
 
