@@ -1551,8 +1551,13 @@ final class ImmersiveUi {
             if (!model.aid.equals(lastAcceptedAid)) {
                 lastAcceptedAid = model.aid;
                 Log.d(DouyinModule.TAG,
-                        "feed item accepted as video: "
-                                + model.classificationDetails());
+                        "feed item accepted: " + model.classificationDetails());
+            }
+            // 图文/直播等非视频内容不进入视频沉浸：恢复正常界面，避免黑屏
+            if (!model.isVideoContent()) {
+                restoreAll(activeActivity(), decor);
+                removeDownloadButton();
+                return true;
             }
             return false;
         }

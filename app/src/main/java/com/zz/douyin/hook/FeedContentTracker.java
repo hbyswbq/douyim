@@ -568,6 +568,25 @@ final class FeedContentTracker {
             return filterReason != null;
         }
 
+        /** 是否为图文/图集/幻灯片内容。 */
+        boolean isPhoto() {
+            return hostImage
+                    || hostMultiImage
+                    || slides
+                    || awemeType == 2
+                    || awemeType == 0x44
+                    || imageCount > 0
+                    || imageInfoCount > 0;
+        }
+
+        /**
+         * 是否为可进入视频沉浸的内容：必须有视频、非图文、非直播
+         * （直播有自己的互动界面，不应被视频沉浸隐藏）。
+         */
+        boolean isVideoContent() {
+            return hasVideo && !isPhoto() && !live;
+        }
+
         boolean hasDownloadUrl() {
             return !playUrls.isEmpty();
         }
