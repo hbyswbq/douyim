@@ -92,6 +92,7 @@ final class ImmersiveUi {
     private static int filterCandidateCount;
     private static long filterCandidateAt;
     private static String lastAcceptedAid;
+    private static long suppressSingleTapUntil;
 
     private ImmersiveUi() {
     }
@@ -119,6 +120,11 @@ final class ImmersiveUi {
 
     static boolean shouldBlockDoubleTap() {
         return moduleEnabled && blockDoubleTap;
+    }
+
+    /** 双击已被识别并处理时，暂时抑制单击暂停/播放逻辑，避免双击被拆成单击。 */
+    static void suppressSingleTap(long durationMs) {
+        suppressSingleTapUntil = SystemClock.uptimeMillis() + durationMs;
     }
 
     private static void refreshPreferences(SharedPreferences preferences) {
@@ -283,6 +289,11 @@ final class ImmersiveUi {
                 || event.getRawX() > decor.getWidth() * 0.82f
                 || event.getRawY() < decor.getHeight() * 0.12f
                 || event.getRawY() > decor.getHeight() * 0.86f))) {
+            return;
+        }
+
+        // 双击刚被识别处理时，跳过本次单击暂停/播放，避免退出沉浸、缩小视频
+        if (SystemClock.uptimeMillis() < suppressSingleTapUntil) {
             return;
         }
 
