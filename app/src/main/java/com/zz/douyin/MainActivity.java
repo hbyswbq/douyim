@@ -39,8 +39,6 @@ public final class MainActivity extends Activity
     private Switch showDanmaku;
     private Switch immersiveStatusBar;
     private Switch immersiveNavBar;
-    private Button doubleTapLike;
-    private Button doubleTapComment;
     private EditText keywordInput;
     private Button saveKeywords;
     private SharedPreferences preferences;
@@ -159,34 +157,6 @@ public final class MainActivity extends Activity
         blockDoubleTap = addSwitch(playbackCard, "禁用屏幕双击",
                 "拦截视频画面双击，保留单击暂停、滑动和侧边长按",
                 FilterPreferences.KEY_BLOCK_DOUBLE_TAP);
-        addDivider(playbackCard);
-        // 双击响应类型
-        TextView doubleTapLabel = text("双击视频响应", 17, TEXT_PRIMARY);
-        doubleTapLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        doubleTapLabel.setPadding(dp(16), dp(14), dp(16), dp(6));
-        playbackCard.addView(doubleTapLabel, matchWrap());
-        TextView doubleTapDesc = text("选择双击视频时的行为：点赞或打开评论区", 13, TEXT_SECONDARY);
-        doubleTapDesc.setPadding(dp(16), 0, dp(16), dp(8));
-        playbackCard.addView(doubleTapDesc, matchWrap());
-        LinearLayout doubleTapRow = new LinearLayout(this);
-        doubleTapRow.setOrientation(LinearLayout.HORIZONTAL);
-        doubleTapRow.setPadding(dp(16), 0, dp(16), dp(14));
-        doubleTapLike = new Button(this);
-        doubleTapLike.setText("点赞");
-        doubleTapLike.setTextSize(14);
-        doubleTapLike.setAllCaps(false);
-        doubleTapLike.setOnClickListener(v -> setDoubleTapMode(FilterPreferences.DOUBLE_TAP_LIKE));
-        LinearLayout.LayoutParams likeParams = new LinearLayout.LayoutParams(0, dp(40), 1f);
-        likeParams.rightMargin = dp(8);
-        doubleTapRow.addView(doubleTapLike, likeParams);
-        doubleTapComment = new Button(this);
-        doubleTapComment.setText("打开评论");
-        doubleTapComment.setTextSize(14);
-        doubleTapComment.setAllCaps(false);
-        doubleTapComment.setOnClickListener(v -> setDoubleTapMode(FilterPreferences.DOUBLE_TAP_COMMENT));
-        LinearLayout.LayoutParams commentParams = new LinearLayout.LayoutParams(0, dp(40), 1f);
-        doubleTapRow.addView(doubleTapComment, commentParams);
-        playbackCard.addView(doubleTapRow, matchWrap());
         LinearLayout.LayoutParams playbackCardParams = matchWrap();
         playbackCardParams.topMargin = dp(10);
         root.addView(playbackCard, playbackCardParams);
@@ -294,7 +264,6 @@ public final class MainActivity extends Activity
         showDanmaku.setChecked(FilterPreferences.readShowDanmaku(preferences));
         immersiveStatusBar.setChecked(FilterPreferences.readImmersiveStatusBar(preferences));
         immersiveNavBar.setChecked(FilterPreferences.readImmersiveNavBar(preferences));
-        updateDoubleTapButtons(FilterPreferences.readDoubleTapMode(preferences));
         keywordInput.setText(values.keywordText);
         keywordInput.setSelection(keywordInput.length());
         serviceStatus.setText(
@@ -354,31 +323,6 @@ public final class MainActivity extends Activity
         }
     }
 
-    private void saveInt(String key, int value) {
-        SharedPreferences current = preferences;
-        if (current == null) {
-            return;
-        }
-        SharedPreferences.Editor editor = current.edit();
-        if (editor != null) {
-            editor.putInt(key, value).apply();
-        }
-    }
-
-    private void setDoubleTapMode(int mode) {
-        if (loading) return;
-        saveInt(FilterPreferences.KEY_DOUBLE_TAP_MODE, mode);
-        updateDoubleTapButtons(mode);
-    }
-
-    private void updateDoubleTapButtons(int mode) {
-        boolean isLike = mode == FilterPreferences.DOUBLE_TAP_LIKE;
-        doubleTapLike.setBackground(rounded(isLike ? PRIMARY : Color.rgb(58, 60, 68), 10));
-        doubleTapLike.setTextColor(isLike ? Color.WHITE : TEXT_SECONDARY);
-        doubleTapComment.setBackground(rounded(!isLike ? PRIMARY : Color.rgb(58, 60, 68), 10));
-        doubleTapComment.setTextColor(!isLike ? Color.WHITE : TEXT_SECONDARY);
-    }
-
     private void saveKeywordSettings() {
         SharedPreferences current = preferences;
         if (current == null) {
@@ -408,10 +352,6 @@ public final class MainActivity extends Activity
         showDanmaku.setEnabled(enabled);
         immersiveStatusBar.setEnabled(enabled);
         immersiveNavBar.setEnabled(enabled);
-        doubleTapLike.setEnabled(enabled);
-        doubleTapComment.setEnabled(enabled);
-        doubleTapLike.setAlpha(enabled ? 1f : 0.45f);
-        doubleTapComment.setAlpha(enabled ? 1f : 0.45f);
         keywordInput.setEnabled(enabled);
         saveKeywords.setEnabled(enabled);
         saveKeywords.setAlpha(enabled ? 1f : 0.45f);

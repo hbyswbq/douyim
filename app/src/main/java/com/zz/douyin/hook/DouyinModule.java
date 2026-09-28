@@ -57,7 +57,6 @@ public final class DouyinModule extends XposedModule {
                             com.zz.douyin.FilterPreferences.NAME
                     );
                     ImmersiveUi.configurePreferences(preferences);
-                    DoubleTapGuard.configure(preferences);
                     SystemImmersive.configure(
                             com.zz.douyin.FilterPreferences.readImmersiveEnabled(preferences),
                             com.zz.douyin.FilterPreferences.readImmersiveStatusBar(preferences),
@@ -120,7 +119,6 @@ public final class DouyinModule extends XposedModule {
                     Object result = chain.proceed();
                     Activity activity = (Activity) chain.getThisObject();
                     ImmersiveUi.onActivityResumed(activity);
-                    DoubleTapGuard.setCurrentActivity(activity);
                     return result;
                 });
 
